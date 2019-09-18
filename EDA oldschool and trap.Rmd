@@ -1,0 +1,175 @@
+---
+title: "Explore the Differences Between Oldschool Hiphop and Trap"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+I am a huge fan of hip-hop music. If you love hip-hop like me, you'll definitely know that there are basically two genres of hip-hop, one is old school and the other is new school. Old school music typically refers to music created around 1980s. The representative singers are Tupac, Biggie and Eminem. However, people nowadays are more in loved with new school, especially trap. New school comes later than old school: Travis Scott, Lil Pump and ASAP Rocky are all new school singers.
+
+Many people are really missing the old school times because they said the old school songs are all about fighting for their lives, peace and love while the trap songs are always talking about drugs and women.
+So let's do a data anlysis to find if the topic of hip-hop lyrics changes during those decands.
+
+### Load all the required libraries
+
+From the packages' descriptions:
+
++ `tidyverse` is an opinionated collection of R packages designed for data science. All packages share an underlying design philosophy, grammar, and data structures;
++ `tidytext` allows text mining using 'dplyr', 'ggplot2', and other tidy tools;
++ `plotly` allows plotting interactive graphs;
++ `DT` provides an R interface to the JavaScript library DataTables;
++ `tm` is a framework for text mining applications within R;
++ `scales` map data to aesthetics, and provide methods for automatically determining breaks and labels for axes and legends;
++ `data.table` is a package for fast aggregation of large data;
++ `wordcloud2` provides an HTML5 interface to wordcloud for data visualization;
++ `gridExtra` contains miscellaneous functions for "grid" graphics;
++ `ngram` is for constructing n-grams (¡°tokenizing¡±), as well as generating new text based on the n-gram structure of a given text input (¡°babbling¡±);
++ `Shiny` is an R package that makes it easy to build interactive web apps straight from R;
+
+```{r load libraries, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(tidytext)
+library(plotly)
+library(DT)
+library(tm)
+library(data.table)
+library(scales)
+library(wordcloud)
+library(gridExtra)
+library(ngram)
+library(ggplot2)
+library(topicmodels)
+```
+
+
+### Load the processed lyrics data along with artist information
+
+We use the processed data and artist information for our analysis.
+
+```{r load data, warning=FALSE, message=FALSE}
+# load lyrics data
+load('processed_lyrics.RData')
+#To divide the hip-hop music, I use two turning point,year 2000 and year 2010. Before 2000, the hiphop songs are mostly oldschool and after 2010, trap becomes the most popular one among all hiphop music. Now we can get the dataset of two genres.
+hiphop<-dt_lyrics[dt_lyrics$genre=="Hip-Hop",]
+old_school<-hiphop[hiphop$year<2000,]
+trap_<-hiphop[hiphop$year>=2010,]
+
+oschool<-VCorpus(VectorSource(old_school$stemmedwords))
+tra<-VCorpus(VectorSource(trap_$stemmedwords))
+
+oldschool<-TermDocumentMatrix(oschool)
+trap<-TermDocumentMatrix(tra)
+```
+
+### Word Cloud EDA
+
+First, let us look at the wordcloud of different hip-hop music.
+
+```{r , warning=FALSE, message=FALSE}
+set.seed(1234)
+d_os<- data.frame(word = names(sort(rowSums(as.matrix(oldschool)),decreasing=TRUE)),freq=sort(rowSums(as.matrix(oldschool)),decreasing=TRUE))
+d_tr<- data.frame(word = names(sort(rowSums(as.matrix(trap)),decreasing=TRUE)),freq=sort(rowSums(as.matrix(trap)),decreasing=TRUE))
+#old school wordcloud
+wordcloud(words = d_os$word, freq = d_os$freq, min.freq = 1,
+          max.words=200, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(7, "Dark2"))
+#trap wordcloud
+wordcloud(words = d_tr$word, freq = d_tr$freq, min.freq = 1,
+          max.words=200, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(9, "Dark2"))
+
+```
+
+We can see from those two wordclouds that love is the most frequent word in both two types of hiphop, meanwhile, girl, baby and time are also popular among two genres. 
+
+As for the differences, the word money becomes more popular in recent hiphop, which is because that comparing to the old days, many rappers have earned a lot thanks to the audience and the culture. So we can hear a lot of rappers talking about flexing and money in nowadays raps. On the other hand, the word live is more poplar in old school songs because many of them were fighting for their lives an rights through hiphop music in the golden age.
+
+### Topic Modeling
+
+We use topic modeling to further explore different types of hiphop.
+
+```{r , warning=FALSE, message=FALSE}
+os_lda <-LDA(oldschool, k = 2,control=list(seed=0))
+ldaOut.topics1 <- as.matrix(topics(os_lda))
+ostopic1<-ldaOut.topics1[ldaOut.topics1==1,]
+ostopic2<-ldaOut.topics1[ldaOut.topics1==2,]
+
+tr_lda <-LDA(trap, k = 2,control=list(seed=0))
+ldaOut.topics2 <- as.matrix(topics(tr_lda))
+trtopic1<-ldaOut.topics2[ldaOut.topics2==1,]
+trtopic2<-ldaOut.topics2[ldaOut.topics2==2,]
+
+os_topic<-cbind(as.vector(names(ostopic1)),as.vector(names(ostopic2)))
+head(os_topic,15)
+
+tr_topic<-cbind(as.vector(names(trtopic1)),as.vector(names(trtopic2)))
+head(tr_topic,15)
+
+
+```
+
+It is very interesting so see that in trap songs, there are more modal particles, such as aah,aaa and aaw. This matches our impressions on trap. To illustrate, mumble rappers, such as Lil Pump and XXXtentacion, they use a lot of modal particles to create some chill vibes. It turns out that trap songs do not focus too much on the real meanings of the words, in many cases, they just want to create some grooves that people can sway with. 
+
+### Sentiment Analysis
+
+We use the processed data and artist information for our analysis.
+
+```{r , warning=FALSE, message=FALSE}
+ap_td1 <- tidy(oldschool)
+ap_sentiments1 <- ap_td1 %>%
+       inner_join(get_sentiments("bing"), by = c(term = "word"))
+ap_sentiments1
+
+ap_td2 <- tidy(trap)
+ap_sentiments2 <- ap_td2 %>%
+       inner_join(get_sentiments("bing"), by = c(term = "word"))
+ap_sentiments2
+
+library(ggplot2)
+
+#old school
+ap_sentiments1 %>%
+  count(sentiment, term, wt = count) %>%
+  filter(n >= 30) %>%
+  mutate(n = ifelse(sentiment == "negative", -n, n)) %>%
+  mutate(term = reorder(term, n)) %>%
+  ggplot(aes(term, n, fill = sentiment)) +
+  geom_bar(stat = "identity") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ylab("Contribution to sentiment")
+
+#trap
+ap_sentiments2 %>%
+  count(sentiment, term, wt = count) %>%
+  filter(n >= 300) %>%
+  mutate(n = ifelse(sentiment == "negative", -n, n)) %>%
+  mutate(term = reorder(term, n)) %>%
+  ggplot(aes(term, n, fill = sentiment)) +
+  geom_bar(stat = "identity") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ylab("Contribution to sentiment")
+```
+
+We can see from the graph that in hiphop lyrics, most words are negative. Old school music does have more positive words than trap music. Especially, some words like peace and respect are more often shown in old school songs, which is corresponding to the statement in the beginning, many old school rappers are singing for respect, peace and love. While rich and shine appear in the trap graph. As we have said above, rappers nowadays are becoming richer and they like to flex about lux lives. 
+
+
+
+
+###                      Conclusion: Old School VS Trap
+
+- #### Love is the most poplar word in both oldschool hiphop and trap. 
+
+- #### Most words are negative in two types of hiphop.
+
+- #### In oldschool, peace and respect are more frequent while in trap music, money and rich are more popular words.
+
+- #### In trap, there are more modal particles, such as aah, it is because that trap music is meant to create some grooves that people can dance with.
+
+
+
+
+
